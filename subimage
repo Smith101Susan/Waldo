@@ -1,0 +1,92 @@
+#!/usr/bin/env python
+import sys
+import os.path
+import imghdr
+import filecmp
+import cv2
+import numpy as np
+
+# Check to make certain we have two files to compare
+if ((len(sys.argv) == 1) or (sys.argv[1] == '-h')):
+	print "Useage: subimage ./path/image_name_1.jpeg ./path/image_name_2.jpeg"
+	sys.exit(0)
+elif len(sys.argv) != 3:
+	num_files = len(sys.argv) - 1
+	print "Number of files given was", num_files, "and should have been 2."
+	sys.exit(1)
+
+# Grab their file names
+pic_1 = sys.argv[1] 
+pic_2 = sys.argv[2] 
+
+# Check to make certain the files exist
+if not os.path.isfile(pic_1):
+	print pic_1, " is not found."
+	sys.exit(2) 
+if not os.path.isfile(pic_2):
+	print pic_2, " is not found."
+	sys.exit(2) 
+
+# Check to make certain the files are jpegs
+img_type_one = imghdr.what(pic_1)
+if img_type_one != 'jpeg':
+	print "Image ", pic_1, "is not a jpeg file."
+	sys.exit(3)	
+img_type_two = imghdr.what(pic_1)
+if img_type_two != 'jpeg':
+	print "Image ", pic_1, "is not a jpeg file."
+	sys.exit(3)	
+
+# Check to make certain they are two different files
+if filecmp.cmp(pic_1, pic_2):
+	print pic_1, "and", pic_2, "are actually the same file."
+	sys.exit(0)
+
+# Check to see if one image is larger than the other image as "most" likely the smaller one will be the cropped picture
+# NOTE: I'm assuming if they are the same size and that since I already did a file compare to make certain they were
+#       not the same file that they can not be a cropped image of one or the other otherwise one should be smaller 
+# NOTE2: my assumption could be wrong if the resolution of the cropped image is actually better than the full image
+img_one_size = os.path.getsize(pic_1)
+img_two_size = os.path.getsize(pic_2)
+
+full_img = ''
+cropped_img =''
+if img_one_size > img_two_size:
+	full_img = pic_1
+	cropped_img = pic_2
+else:
+	full_img = pic_1
+	cropped_img = pic_2
+
+# Read in the full image
+img_rgb = cv2.imread(full_img)
+img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_BGR2GRAY)
+
+# Read in the cropped image
+cropped = cv2.imread(cropped_img,0)
+
+res = cv2.matchTemplate(img_gray,cropped,cv2.TM_CCOEFF_NORMED)
+
+# Tell it, it doesn't have to be a perfect match and grab the location(s) of where the subimages are
+threshold = 0.99
+loc = np.where( res >= threshold)
+
+# Print out the image locations of subimage(s)
+# There could be the case where there actually is the same image over and over so give them all
+counter = 0
+for pt in zip(*loc[::-1]):
+	counter = counter + 1
+	if counter == 1:
+		print cropped_img, "is a subimage of", full_img
+		print "\nThe match(es) are located at:"
+ 	print counter, "- location:", pt
+
+if counter == 0:
+	print "It does not appear that one of the images is part of the other."
+
+# FINAL NOTES: I assumed that I wasn't to match on an image that is a larger version of the cropped image
+#              I also assumed that I needn't bother with making this into it's own class as it was
+#              to be a conversational piece and a "quick" standalone consol application - although
+#              when the directions say to return the upper left location I think as in return as
+#              an object from a function call and not a print statement - so perhaps I interpretted that 
+#              part incorrectly...
